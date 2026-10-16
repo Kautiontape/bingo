@@ -1,0 +1,28 @@
+{
+  "name": "bingo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "People-watching bingo at bingo.kautiontape.com",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch-path=server --watch-path=public server/index.js",
+    "test": "node --test 'test/*.test.js'",
+    "e2e": "node e2e/share.e2e.js"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.5",
+    "better-sqlite3": "^13.0.3",
+    "hono": "^4.13.13",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.64.1"
+  },
+  "allowScripts": {
+    "better-sqlite3": false
+  }
+}
