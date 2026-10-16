@@ -77,7 +77,15 @@ function limiter(windowMs, max) {
 
 export function createApp({ boards, hub, publicDir, publicUrl = '', heartbeatMs = 25_000, limits = {} }) {
   const files = loadStatic(publicDir);
-  const index = files.get('/index.html').body.toString('utf8');
+  // Cloudflare stretches the browser cache on .js/.css to hours whatever the origin says, so
+  // the page loads its code from /v/<hash of every file>/...: each deploy gets fresh URLs, and
+  // a given URL never changes. Relative module imports inherit the prefix.
+  const version = createHash('sha1').update([...files.values()].map((f) => f.etag).join()).digest('base64url').slice(0, 10);
+  const index = files
+    .get('/index.html')
+    .body.toString('utf8')
+    .replace('href="/styles.css"', `href="/v/${version}/styles.css"`)
+    .replace('src="/js/app.js"', `src="/v/${version}/js/app.js"`);
   const limit = {
     create: limiter(3_600_000, limits.create ?? 20),
     join: limiter(3_600_000, limits.join ?? 120),
@@ -244,13 +252,21 @@ export function createApp({ boards, hub, publicDir, publicUrl = '', heartbeatMs 
   app.get('/mine', (c) => page(c, null));
   app.get('/b/:id', (c) => page(c, boards.snapshot(c.req.param('id'))));
 
-  app.get('*', (c) => {
-    const f = files.get(c.req.path);
-    if (!f || c.req.path === '/index.html') return c.text('Not found', 404);
-    const headers = { 'Content-Type': f.type, ETag: f.etag, 'Cache-Control': 'no-cache' };
+  function serveFile(c, path, cacheControl) {
+    const f = files.get(path);
+    if (!f || path === '/index.html') return c.text('Not found', 404);
+    const headers = { 'Content-Type': f.type, ETag: f.etag, 'Cache-Control': cacheControl };
     if (c.req.header('if-none-match') === f.etag) return c.body(null, 304, headers);
     return c.body(f.body, 200, headers);
+  }
+
+  // A page from before a deploy may still ask for an old version: serve the current file, uncached.
+  app.get('/v/:version/*', (c) => {
+    const v = c.req.param('version');
+    const path = c.req.path.slice(`/v/${v}`.length);
+    return serveFile(c, path, v === version ? 'public, max-age=31536000, immutable' : 'no-cache');
   });
+  app.get('*', (c) => serveFile(c, c.req.path, 'no-cache'));
 
   // Housekeeping for the rate limiters; index.js calls it on a timer.
   app.prune = () => Object.values(limit).forEach((l) => l.prune());

@@ -76,6 +76,21 @@ test('board pages carry the escaped title in preview tags', async () => {
   assert.match(await res.text(), /<title>People Watching Bingo<\/title>/);
 });
 
+test('the page loads its code from a versioned, immutable path', async () => {
+  const html = await (await app.request('/')).text();
+  const src = html.match(/src="(\/v\/[\w-]+\/js\/app\.js)"/)?.[1];
+  assert.ok(src, 'versioned app.js');
+  assert.match(html, /href="\/v\/[\w-]+\/styles\.css"/);
+  const js = await app.request(src);
+  assert.equal(js.status, 200);
+  assert.match(js.headers.get('cache-control'), /immutable/);
+  const nested = await app.request(src.replace('app.js', 'ui/menu.js'));
+  assert.equal(nested.status, 200);
+  const stale = await app.request('/v/old/js/app.js');
+  assert.equal(stale.status, 200);
+  assert.equal(stale.headers.get('cache-control'), 'no-cache');
+});
+
 test('static files revalidate with ETags', async () => {
   const first = await app.request('/js/card.js');
   assert.equal(first.status, 200);

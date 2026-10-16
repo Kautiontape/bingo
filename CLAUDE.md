@@ -27,6 +27,8 @@ because the package ships prebuilt binaries for glibc and musl.
   auth headers, rate limits, SSE, static files, page templating), `events.js` (per-board fan-out), `db.js`.
 - Auth is two random secrets kept in the browser, stored hashed: `x-player-token` per player and
   `x-creator-key` for the creator's controls.
+- The page loads its code from `/v/<content hash>/…` (immutable cache) because Cloudflare forces a
+  4-hour browser cache on `.js`/`.css`. Keep module imports relative so they inherit the prefix.
 - Cards change text on new rounds, edits and item renames; each bumps `boards.rev`, and clients
   refetch their own card when the `rev` in a state event differs.
 
