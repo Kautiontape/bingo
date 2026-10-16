@@ -1,0 +1,24 @@
+name: Deploy to ktn
+on:
+  workflow_run:
+    workflows: ['build & publish']
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  deploy:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: [self-hosted, ktn]
+    permissions:
+      packages: read
+    steps:
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      # /opt/services/bingo is a checkout of this repo, for docker-compose.yml and the nginx conf.
+      - name: Pull image and restart
+        run: |
+          cd /opt/services/bingo
+          git pull --ff-only origin main
+          docker compose pull
+          docker compose up -d
+          docker image prune -f

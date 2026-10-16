@@ -1,0 +1,14 @@
+services:
+  app:
+    image: ghcr.io/kautiontape/bingo:latest
+    container_name: bingo
+    ports:
+      - "127.0.0.1:8116:3000"
+    volumes:
+      - bingo_data:/data
+    environment:
+      - PUBLIC_URL=https://bingo.kautiontape.com
+    restart: always
+
+volumes:
+  bingo_data:
