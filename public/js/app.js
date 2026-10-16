@@ -34,7 +34,7 @@ const confetti = createConfetti($('#confetti'));
 let S = { kind: 'loading' };
 let editing = false;
 let popIdx = -1;
-let seen = { key: '', lines: 0 }; // last bingo count rendered, to spot a new bingo
+let seen = { key: '', lines: 0, blackout: false }; // last result rendered, to spot a new bingo or blackout
 let dismissed = ''; // confetti stopped for this board + bingo count
 
 // --- Private boards ------------------------------------------------------------------------------
@@ -173,6 +173,7 @@ function renderGrid(v, focusIdx) {
     return;
   }
   const sc = score(v.cells, v.marks);
+  grid.classList.toggle('all-marked', sc.blackout && !editing);
   const colors = new Map((S.board?.players ?? []).map((p) => [p.id, p.color]));
   v.cells.forEach((text, i) => {
     const free = text === null;
@@ -182,6 +183,7 @@ function renderGrid(v, focusIdx) {
       S.kind === 'shared' && S.queue.pending.has(i) ? 'pending' : ''].filter(Boolean).join(' ');
     d.textContent = free ? v.freeText : text;
     d.dataset.i = i;
+    d.style.setProperty('--i', i);
     if (editing) {
       d.contentEditable = 'plaintext-only';
       if (d.contentEditable !== 'plaintext-only') d.contentEditable = 'true';
@@ -224,7 +226,9 @@ function renderCelebration(v, sc) {
   const key = v?.key ?? '';
   const sig = `${key}:${lines}`;
   const isNew = key === seen.key && lines > seen.lines;
-  seen = { key, lines };
+  const newBlackout = key === seen.key && Boolean(sc?.blackout) && !seen.blackout;
+  seen = { key, lines, blackout: Boolean(sc?.blackout) };
+  if (!sc?.blackout) endBlackout();
 
   if (isNew) {
     els.pill.classList.remove('pop');
@@ -241,9 +245,58 @@ function renderCelebration(v, sc) {
   els.ctaHead.textContent = sc.blackout ? 'BLACKOUT!' : lines > 1 ? `BINGO ×${lines}!` : 'BINGO!';
   els.ctaSub.textContent = isOwner() ? 'Go again, or make a board of your own.' : 'Make your own copy, or start something new.';
   renderCtaActions();
-  if (dismissed !== sig && !editing) confetti.rain();
+  if (newBlackout) celebrateBlackout();
+  else if (dismissed !== sig && !editing) confetti.rain();
   els.stopConfetti.hidden = !confetti.raining;
 }
+
+// --- Blackout: a full-screen takeover, fireworks out front, then back to the confetti rain ----------
+
+const bo = { el: $('#blackout'), timer: 0 };
+// Each letter of BLACK / OUT! bounces on its own beat; the words stack on narrow screens.
+let letter = 0;
+$('#boTitle').replaceChildren(
+  ...['BLACK', 'OUT!'].map((word) => {
+    const w = document.createElement('span');
+    w.className = 'bo-word';
+    w.setAttribute('aria-hidden', 'true');
+    for (const ch of word) {
+      const span = document.createElement('span');
+      span.textContent = ch;
+      span.style.animationDelay = `${letter * 0.06}s, ${0.6 + letter * 0.08}s`;
+      letter++;
+      w.append(span);
+    }
+    return w;
+  }),
+);
+
+function celebrateBlackout() {
+  clearTimeout(bo.timer);
+  bo.el.classList.remove('bye');
+  bo.el.hidden = false;
+  $('#confetti').classList.add('front');
+  confetti.party();
+  els.app.classList.remove('shake');
+  void els.app.offsetWidth;
+  els.app.classList.add('shake');
+  bo.timer = setTimeout(endBlackout, 6500);
+}
+
+function endBlackout() {
+  clearTimeout(bo.timer);
+  if (bo.el.hidden) return;
+  bo.el.classList.add('bye');
+  bo.timer = setTimeout(() => {
+    bo.el.hidden = true;
+    bo.el.classList.remove('bye');
+    $('#confetti').classList.remove('front');
+  }, 500);
+}
+bo.el.addEventListener('click', endBlackout);
+addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') endBlackout();
+});
 
 function renderCtaActions() {
   const btn = (label, onClick, primary) => {

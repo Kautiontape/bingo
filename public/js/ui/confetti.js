@@ -1,15 +1,17 @@
-// Confetti on a full-screen canvas. rain() keeps it falling until stop(); with reduced
-// motion it becomes one small burst.
+// Confetti on a full-screen canvas that sits behind the page (styles.css). rain() keeps it
+// falling until stop(); party() adds fireworks for a blackout. With reduced motion, both
+// become one small burst.
 
 const COLORS = ['#D3166F', '#FF4FA3', '#5A1FC4', '#A57CFF', '#F5A524', '#FFC453', '#14B8A6', '#3B82F6'];
 const GLYPHS = ['🎉', '👀', '⭐', '✨', '🥳'];
-const MAX = 240;
 
 export function createConfetti(canvas) {
   const ctx = canvas.getContext('2d');
   const reduce = matchMedia('(prefers-reduced-motion: reduce)');
   let parts = [];
   let raining = false;
+  let heavy = false; // blackout: thicker rain while the party lasts
+  let fireworks = 0;
   let raf = 0;
   let last = 0;
   let w = 0;
@@ -27,14 +29,17 @@ export function createConfetti(canvas) {
   resize();
 
   const rnd = (a, b) => a + Math.random() * (b - a);
-  function piece(x, y, burst) {
-    const glyph = Math.random() < 0.08;
-    return {
+
+  /** kind: 'rain' drifts down, 'burst' shoots up from below, 'firework' explodes in a ring. */
+  function piece(x, y, kind) {
+    const glyph = Math.random() < (kind === 'firework' ? 0.04 : 0.08);
+    const p = {
       x, y,
-      vx: burst ? rnd(-7, 7) : rnd(-0.6, 0.6),
-      vy: burst ? rnd(-13, -5) : rnd(1.2, 2.6),
-      g: burst ? 0.32 : 0.035,
-      max: burst ? 8 : 3.6,
+      vx: rnd(-0.6, 0.6),
+      vy: rnd(1.2, 2.6),
+      g: 0.035,
+      max: 3.6,
+      drag: 0.985,
       rot: rnd(0, Math.PI * 2),
       vr: rnd(-0.18, 0.18),
       flip: rnd(0, Math.PI * 2),
@@ -43,15 +48,22 @@ export function createConfetti(canvas) {
       vs: rnd(0.015, 0.045),
       size: glyph ? rnd(18, 26) : rnd(7, 12),
       color: COLORS[(Math.random() * COLORS.length) | 0],
-      kind: glyph ? 'glyph' : Math.random() < 0.28 ? 'dot' : 'paper',
+      shape: glyph ? 'glyph' : Math.random() < 0.28 ? 'dot' : 'paper',
       glyph: GLYPHS[(Math.random() * GLYPHS.length) | 0],
     };
+    if (kind === 'burst') Object.assign(p, { vx: rnd(-7, 7), vy: rnd(-13, -5), g: 0.32, max: 8 });
+    if (kind === 'firework') {
+      const a = rnd(0, Math.PI * 2);
+      const speed = rnd(3, 10);
+      Object.assign(p, { vx: Math.cos(a) * speed, vy: Math.sin(a) * speed - 1.5, g: 0.16, max: 6, drag: 0.965 });
+    }
+    return p;
   }
 
   function draw(p) {
     ctx.save();
     ctx.translate(p.x, p.y);
-    if (p.kind === 'glyph') {
+    if (p.shape === 'glyph') {
       ctx.font = `${p.size}px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -60,7 +72,7 @@ export function createConfetti(canvas) {
     } else {
       ctx.rotate(p.rot);
       ctx.fillStyle = p.color;
-      if (p.kind === 'dot') {
+      if (p.shape === 'dot') {
         ctx.beginPath();
         ctx.arc(0, 0, p.size / 2.6, 0, Math.PI * 2);
         ctx.fill();
@@ -76,13 +88,14 @@ export function createConfetti(canvas) {
     const dt = last ? Math.min((t - last) / 16.67, 3) : 1;
     last = t;
     ctx.clearRect(0, 0, w, h);
-    if (raining && parts.length < MAX) {
-      const n = w < 520 ? 2 : 4;
-      for (let i = 0; i < n; i++) if (Math.random() < 0.65) parts.push(piece(rnd(-20, w + 20), -24, false));
+    const cap = heavy ? 600 : 240;
+    if (raining && parts.length < cap) {
+      const n = (w < 520 ? 2 : 4) * (heavy ? 3 : 1);
+      for (let i = 0; i < n; i++) if (Math.random() < 0.65) parts.push(piece(rnd(-20, w + 20), -24, 'rain'));
     }
     for (const p of parts) {
       p.vy = Math.min(p.vy + p.g * dt, p.max);
-      p.vx *= 0.985;
+      p.vx *= p.drag;
       p.sway += p.vs * dt;
       p.flip += p.vf * dt;
       p.rot += p.vr * dt;
@@ -103,8 +116,21 @@ export function createConfetti(canvas) {
   };
 
   function burst(n = 140) {
-    for (let i = 0; i < n; i++) parts.push(piece(w / 2 + rnd(-w * 0.2, w * 0.2), h * 0.42, true));
+    for (let i = 0; i < n; i++) parts.push(piece(w / 2 + rnd(-w * 0.2, w * 0.2), h * 0.42, 'burst'));
     start();
+  }
+
+  function firework() {
+    const x = rnd(w * 0.12, w * 0.88);
+    const y = rnd(h * 0.12, h * 0.55);
+    for (let i = 0; i < 80; i++) parts.push(piece(x, y, 'firework'));
+    start();
+  }
+
+  function stopParty() {
+    clearTimeout(fireworks);
+    fireworks = 0;
+    heavy = false;
   }
 
   return {
@@ -115,8 +141,24 @@ export function createConfetti(canvas) {
       raining = true;
       burst(90);
     },
+    /** Blackout: fireworks all over the screen and a downpour for `ms`, then normal rain. */
+    party(ms = 5000) {
+      if (reduce.matches) return burst(60);
+      stopParty();
+      raining = true;
+      heavy = true;
+      burst(220);
+      const end = performance.now() + ms;
+      const next = () => {
+        firework();
+        if (Math.random() < 0.5) firework();
+        fireworks = performance.now() < end ? setTimeout(next, rnd(220, 420)) : (heavy = false, 0);
+      };
+      next();
+    },
     // Pieces already in the air drop quickly instead of drifting down for seconds.
     stop() {
+      stopParty();
       if (!raining) return;
       raining = false;
       for (const p of parts) {
