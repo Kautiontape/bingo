@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>People Watching Bingo</title>
+<!--meta-->
+<meta name="theme-color" content="#F4ECF5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#150A1A" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Unbounded:wght@600;800&display=swap">
+<link rel="stylesheet" href="/styles.css">
+<script type="module" src="/js/app.js"></script>
+</head>
+<body>
+<main class="app" id="app" aria-busy="true">
+  <header class="top">
+    <div class="heading">
+      <a class="eyebrow" href="/mine" id="home">bingo<span>.kautiontape.com</span></a>
+      <h1 id="title" class="title">People Watching Bingo</h1>
+    </div>
+    <button id="menuBtn" class="glow menu-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="menu">
+      <span class="spark" aria-hidden="true">✦</span> Menu
+    </button>
+  </header>
+
+  <p id="sub" class="sub">Tap a square when you spot it.</p>
+  <div id="meta" class="meta" hidden></div>
+
+  <div id="board" class="board">
+    <div class="card"><div id="grid" class="grid" role="grid" aria-label="Bingo card"></div></div>
+    <div class="status">
+      <span id="count"></span>
+      <span id="bingo" class="pill" hidden></span>
+      <button id="doneEditing" class="btn small" type="button" hidden>Done editing</button>
+    </div>
+  </div>
+
+  <section id="gone" class="gone" hidden>
+    <h2>This board’s gone.</h2>
+    <p>Shared boards disappear after 90 days without anyone playing, or the link might be mistyped.</p>
+    <a class="btn primary glow" href="/mine">Play people-watching bingo</a>
+  </section>
+
+  <section id="cta" class="cta" hidden aria-live="polite">
+    <p class="cta-head"><strong id="ctaHead">BINGO!</strong> <span id="ctaSub">What’s next?</span></p>
+    <div class="cta-actions" id="ctaActions"></div>
+    <button id="stopConfetti" class="link" type="button">Stop the confetti</button>
+  </section>
+
+  <section id="players" class="players" hidden aria-label="Players">
+    <h2>Players</h2>
+    <ul id="playerList"></ul>
+  </section>
+
+  <footer class="foot">
+    <a href="https://kautiontape.com">kautiontape.com</a>
+  </footer>
+</main>
+
+<div id="menu" class="menu" role="menu" aria-labelledby="menuBtn" hidden></div>
+
+<dialog id="createDlg" class="dlg wide" aria-labelledby="createHead">
+  <form method="dialog" id="createForm" novalidate>
+    <header class="dlg-head">
+      <h2 id="createHead">Create custom board</h2>
+      <button class="x" type="button" data-close aria-label="Close">×</button>
+    </header>
+    <label class="field">
+      <span class="label">Title</span>
+      <input id="fTitle" name="title" maxlength="60" autocomplete="off" placeholder="Airport Bingo" required>
+    </label>
+    <div class="field">
+      <div class="label-row">
+        <label class="label" for="fItems">Squares, one per line</label>
+        <span id="fTally" class="tally"></span>
+      </div>
+      <textarea id="fItems" name="items" spellcheck="true" placeholder="Someone running for the gate&#10;Neck pillow worn while walking&#10;Overhead bin battle"></textarea>
+      <button id="fStarter" class="link" type="button">Fill in the people-watching list</button>
+    </div>
+    <fieldset class="field">
+      <legend class="label">Card size</legend>
+      <div class="seg">
+        <input type="radio" name="size" id="fS3" value="3"><label for="fS3">3×3</label>
+        <input type="radio" name="size" id="fS4" value="4"><label for="fS4">4×4</label>
+        <input type="radio" name="size" id="fS5" value="5"><label for="fS5">5×5</label>
+      </div>
+    </fieldset>
+    <div class="field freerow">
+      <label class="check"><input type="checkbox" id="fFree"> Free center square</label>
+      <input id="fFreeText" class="freetext" aria-label="Free square text" maxlength="40" autocomplete="off">
+    </div>
+    <fieldset class="field" id="fModeSet">
+      <legend class="label">When you share it</legend>
+      <div class="modes">
+        <input type="radio" name="mode" id="fModeCards" value="cards">
+        <label for="fModeCards"><strong>Everyone gets a card</strong><span>Same list, a different card for each person. Race to bingo.</span></label>
+        <input type="radio" name="mode" id="fModeShared" value="shared">
+        <label for="fModeShared"><strong>One shared card</strong><span>Everyone marks the same card together.</span></label>
+      </div>
+      <p id="fModeNote" class="note" hidden>The mode is set when a board is shared and can’t change.</p>
+    </fieldset>
+    <p id="fError" class="error" role="alert"></p>
+    <footer class="dlg-foot">
+      <button class="btn" type="button" data-close>Cancel</button>
+      <button class="btn primary" type="submit" id="fSubmit">Create &amp; share</button>
+    </footer>
+  </form>
+</dialog>
+
+<dialog id="shareDlg" class="dlg" aria-labelledby="shareHead">
+  <header class="dlg-head">
+    <h2 id="shareHead">Invite people</h2>
+    <button class="x" type="button" data-close aria-label="Close">×</button>
+  </header>
+  <div id="shareBody"></div>
+</dialog>
+
+<dialog id="nameDlg" class="dlg" aria-labelledby="nameHead">
+  <form method="dialog" id="nameForm">
+    <header class="dlg-head">
+      <h2 id="nameHead">What should we call you?</h2>
+      <button class="x" type="button" data-close aria-label="Close">×</button>
+    </header>
+    <label class="field">
+      <span class="label">Name</span>
+      <input id="nInput" maxlength="30" autocomplete="nickname" required>
+    </label>
+    <p id="nError" class="error" role="alert"></p>
+    <footer class="dlg-foot">
+      <button class="btn" type="button" data-close>Cancel</button>
+      <button class="btn primary" type="submit">Save</button>
+    </footer>
+  </form>
+</dialog>
+
+<div id="toasts" class="toasts" aria-live="polite"></div>
+<canvas id="confetti" class="confetti" aria-hidden="true"></canvas>
+</body>
+</html>
